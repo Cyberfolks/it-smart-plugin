@@ -208,7 +208,16 @@ class IT_Smart_Invoicing_Admin {
         );
     }
 
-    public function render_box( $post ) {
+    public function render_box($post) {
+        $order_id = $post->ID;
+
+        $generate_url = wp_nonce_url( admin_url("admin-post.php?action=itsi_generate_invoice&order_id=$order_id"), 'itsi_generate_invoice' );
+
+        echo '<a href="' . esc_url($generate_url) . '" class="button button-primary">Generate Invoice</a>';
+    }
+    
+
+    /* public function render_box( $post ) {
         $order_id = $post->id;
         ?>
 
@@ -222,5 +231,5 @@ class IT_Smart_Invoicing_Admin {
             <?php endif; ?>
         </div>
         <?php
-    }
+    } */
 }
