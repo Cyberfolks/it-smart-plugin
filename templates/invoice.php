@@ -6,6 +6,7 @@
  */
 
 if ( ! isset( $order ) || ! $order instanceof WC_Order ) {
+    echo '<div class="notice notice-error"><p>WC_Order, order.</p></div>';
     return;
 }
 
