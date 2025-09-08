@@ -1,0 +1,226 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit;
+use Dompdf\Dompdf;
+
+class IT_Smart_Invoicing_Admin {
+
+    public function __construct() {
+        // Classic orders
+        add_action( 'add_meta_boxes_shop_order', [ $this, 'add_box' ] );
+        // HPOS orders
+        add_action( 'add_meta_boxes', [ $this, 'maybe_add_box' ], 20, 2 );
+        add_action( 'admin_menu', [ $this, 'register_print_button' ] );
+        add_action( 'admin_post_itsi_invoice', [ $this, 'render_invoice_page' ] );
+        add_action( 'admin_post_itsi_invoice_pdf', [ $this, 'render_invoice_pdf' ] );
+         add_action('admin_menu', [$this, 'register_admin_menu']);
+    }
+
+    public function register_admin_menu() {
+        add_menu_page(
+            'IT Smart Invoicing',                 // Page title
+            'Invoicing',                          // Menu title
+            'manage_woocommerce',                 // Capability
+            'itsi-invoicing',                     // Slug
+            [$this, 'render_settings_page'],      // Callback
+            'dashicons-media-document',           // Icon
+            56                                    // Position
+        );
+    }
+
+    public function render_settings_page() {
+        include plugin_dir_path(__FILE__) . '../admin/settings-page.php';
+    }
+
+    function render_invoice_page2() {
+            if ( ! current_user_can('manage_woocommerce') ) {
+                wp_die('No permission');
+            }
+
+            $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
+            $action   = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : '';
+
+            if ( ! $order_id ) {
+                echo "<p>No order selected.</p>";
+                return;
+            }
+
+            $order = wc_get_order($order_id);
+
+            if ( ! $order ) {
+                echo "<p>Invalid order.</p>";
+                return;
+            }
+
+            ob_start();
+            include plugin_dir_path(__FILE__) . 'templates/invoice-template.php';
+            $html = ob_get_clean();
+
+            if ( $action === 'download' ) {
+                // Generate PDF
+                require_once __DIR__ . '/vendor/autoload.php';
+                $dompdf = new Dompdf\Dompdf();
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+                $dompdf->stream("invoice-{$order_id}.pdf", ["Attachment" => true]);
+                exit;
+            } elseif ( $action === 'print' ) {
+                // Show in browser + auto print
+                echo $html;
+                echo "<script>window.onload = function(){ window.print(); }</script>";
+                exit;
+            } else {
+                echo "<p>Please select Print or Download.</p>";
+            }
+        }
+
+
+    public function render_invoice_pdf() {
+        if ( ! isset( $_GET['order_id'] ) ) {
+            wp_die( 'No order ID provided.' );
+        }
+
+        $order_id = absint( $_GET['order_id'] );
+		
+        $order    = wc_get_order( $order_id );
+
+        if ( ! $order ) {
+            wp_die( 'Invalid order ID.' );
+        }
+
+        // Capture template output
+        ob_start();
+        include plugin_dir_path( dirname( __FILE__ ) ) . 'templates/invoice.php';
+        $html = ob_get_clean();
+
+        if ( empty( $html ) ) {
+            wp_die( 'Invoice template returned no content.' );
+        }
+
+        // Load Dompdf
+        if ( ! class_exists( '\Dompdf\Dompdf' ) ) {
+            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'vendor/autoload.php';
+        }
+
+        try {
+			if ( ! class_exists( '\Dompdf\Dompdf' ) ) {
+				wp_die('Dompdf class not found — check vendor/autoload.php');
+			}
+			// echo $html;
+			// exit;
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml( $html );
+            $dompdf->setPaper( 'A4', 'portrait' );
+            $dompdf->render();
+
+            // Send to browser
+            $dompdf->stream( 'invoice-' . $order_id . '.pdf', [
+                'Attachment' => true
+            ]);
+            exit;
+        } catch ( Exception $e ) {
+            wp_die( 'PDF generation failed: ' . $e->getMessage() );
+        }
+    }
+
+
+    public function register_print_button() {
+        // no submenu, just the button in order screen (we already did this)
+    }
+
+    // public function register_print_page() {
+    //     add_submenu_page(
+    //         null, // hidden page
+    //         'Invoice Print',
+    //         'Invoice Print',
+    //         'manage_woocommerce',
+    //         'itsi-invoice',
+    //         [ $this, 'render_invoice_page' ]
+    //     );
+    // }
+
+    public function render_invoice_page() {
+        if ( ! isset( $_GET['order_id'] ) ) {
+            wp_die( 'No order ID.' );
+        }
+
+        $order_id = absint( $_GET['order_id'] );
+        $order    = wc_get_order( $order_id );
+
+        if ( ! $order ) {
+            wp_die( 'Invalid order.' );
+        }
+
+        // Load invoice template
+        $template_file = plugin_dir_path( dirname( __FILE__ ) ) . 'templates/invoice.php';
+
+        if ( file_exists( $template_file ) ) {
+            include $template_file;
+        } else {
+            wp_die( 'Invoice template missing.' );
+        }
+
+        exit;
+    }
+
+    public function maybe_add_box( $post_type, $post ) {
+        global $current_screen;
+            echo "<br>";
+            echo "current_screen id is";
+            echo "<br>";
+            echo $current_screen->id;
+        if ( isset( $current_screen->id ) && $current_screen->id === 'woocommerce_page_wc-orders' ) {
+            add_meta_box(
+                'it-smart-invoicing-box',
+                __( 'Invoice/Packing', 'it-smart-invoicing' ),
+                [ $this, 'render_box' ],
+                $current_screen->id,
+                'side',
+                'default'
+            );
+        }
+    }
+
+
+    // public function maybe_add_box( $post_type ) {
+    //     echo $post_type;
+    //     echo "<br>";
+    //     echo "THIS IS TYPE";
+    //     if ( ! class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+    //         echo 'FeaturesUtil not found';
+    //         return; // Not HPOS
+    //     }
+    //     // if ( $post_type === 'shop_order' || $post_type === 'wc_order' ) {
+    //         $this->add_box();
+    //     // }
+    // }
+
+    public function add_box() {
+        echo "<br>";
+        echo "add_box Called";
+        add_meta_box(
+            'it-smart-invoicing-box',
+            __( 'Invoicing', 'it-smart-invoicing' ),
+            [ $this, 'render_box' ],
+            'shop_order',
+            'side',
+            'default'
+        );
+    }
+
+    public function render_box( $post ) {
+        $order_id = $post->id;
+        ?>
+
+        <div class="wrap">
+            <h1>Order Actions</h1>
+            <?php if ($order_id): ?>
+                <a href="<?php echo admin_url( 'admin-post.php?action=itsi_invoice&order_id=' . $order_id ); ?>"><?php esc_html_e( 'Print Invoice', 'it-smart-invoicing' ); ?></a>
+                <a href="<?php echo admin_url("admin.php?page=print_invoice&order_id=$order_id&action=download"); ?>" target="_blank" class="button">Download PDF</a>
+            <?php else: ?>
+                <p>Please select an order.</p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+}

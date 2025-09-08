@@ -1,0 +1,10 @@
+vendor
+composer.lock
+composer.json
+ddgfd.php
+insctructions.txt
+*.ppk
+*.pem
+*.pub
+putty
+server_putty.lnk
