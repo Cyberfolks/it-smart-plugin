@@ -30,7 +30,7 @@ class IT_Smart_Invoicing_Admin {
     public function register_admin_menu() {
         add_menu_page(
             'IT Smart Invoicing',                 // Page title
-            'Invoicing',                          // Menu title
+            'IT Smart Invoicing',                 // Menu title
             'manage_woocommerce',                 // Capability
             'itsi-invoicing',                     // Slug
             [$this, 'render_settings_page'],      // Callback
@@ -236,12 +236,36 @@ class IT_Smart_Invoicing_Admin {
             'default'
         );
     }
-
     public function render_box($post) {
+        $order_id = $post->ID;
+        $invoice_table = $wpdb->prefix . 'itsi_invoices';
+        $invoice = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM $invoice_table WHERE order_id = %d",
+            $order_id
+        ) );
+
+        if ( $invoice ) {
+            $invoice_number = $invoice->invoice_number;
+
+            echo '<p><strong>Invoice Number:</strong> ' . esc_html( $invoice_number ) . '</p>';
+
+            $print_url   = admin_url( 'admin.php?page=itsi-view-invoice&order_id=' . $order_id . '&invoice=' . $invoice_number . '&mode=print' );
+            $download_url = admin_url( 'admin-post.php?action=itsi_download_invoice&order_id=' . $order_id );
+
+            echo '<a href="' . esc_url( $print_url ) . '" target="_blank" class="button">Print Invoice</a> ';
+            echo '<a href="' . esc_url( $download_url ) . '" class="button button-primary">Download PDF</a>';
+
+        } else {
+            $generate_url = admin_url( 'admin-post.php?action=itsi_generate_invoice&order_id=' . $order_id );
+            echo '<a href="' . esc_url( $generate_url ) . '" class="button button-primary">Generate Invoice</a>';
+        }
+    }
+
+    /*public function render_box($post) {
         $order_id = $post->ID;
         $generate_url = wp_nonce_url( admin_url("admin-post.php?action=itsi_generate_invoice&order_id=$order_id"), 'itsi_generate_invoice' );
         echo '<a href="' . esc_url($generate_url) . '" class="button button-primary">Generate Invoice</a>';
-    }
+    }*/
     
 
     /* public function render_box( $post ) {

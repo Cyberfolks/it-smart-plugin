@@ -6,7 +6,7 @@
  * Author: Your Name
  * Text Domain: it-smart-invoicing
  */
-
+use Dompdf\Dompdf;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -137,10 +137,22 @@ function itsi_generate_invoice_handler() {
     ]);
 
     // Redirect back to order page
-    wp_redirect( admin_url("post.php?post=$order_id&action=edit&itsi_msg=created&invoice=$invoice_number") );
+    // wp_redirect( admin_url("post.php?post=$order_id&action=edit&itsi_msg=created&invoice=$invoice_number") );
     exit;
 }
+function render_invoice_page() {
+    $order_id       = intval( $_GET['order_id'] );
+    $invoice_number = sanitize_text_field( $_GET['invoice'] );
+    $mode           = sanitize_text_field( $_GET['mode'] ?? '' );
 
+    $order = wc_get_order( $order_id );
+
+    include plugin_dir_path( __FILE__ ) . '../templates/invoice.php';
+
+    if ( $mode === 'print' ) {
+        echo "<script>window.print();</script>";
+    }
+}
 add_action('admin_notices', function() {
     if ( isset($_GET['itsi_msg']) ) {
         if ( $_GET['itsi_msg'] === 'created' && isset($_GET['invoice']) ) {
@@ -150,3 +162,26 @@ add_action('admin_notices', function() {
         }
     }
 });
+
+
+function itsi_download_invoice_handler() {
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        wp_die( 'Not allowed' );
+    }
+
+    $order_id = intval( $_GET['order_id'] );
+    $order    = wc_get_order( $order_id );
+
+    ob_start();
+    include plugin_dir_path( __FILE__ ) . 'templates/invoice.php';
+    $html = ob_get_clean();
+
+    $dompdf = new Dompdf();
+    $dompdf->loadHtml( $html );
+    $dompdf->setPaper('A4', 'portrait');
+    $dompdf->render();
+
+    $dompdf->stream( "invoice-$order_id.pdf", [ "Attachment" => true ] );
+    exit;
+}
+add_action( 'admin_post_itsi_download_invoice', 'itsi_download_invoice_handler' );
