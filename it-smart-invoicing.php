@@ -28,6 +28,24 @@ add_action( 'before_woocommerce_init', function() {
     }
 });
 
+add_action('admin_head', function() {
+    if (isset($_GET['page']) && $_GET['page'] === 'itsi-view-invoice') {
+        ?>
+        <style>
+            #wpadminbar, 
+            #adminmenumain, 
+            #wpfooter, 
+            #screen-meta-links,
+            #screen-meta,
+            #contextual-help-link-wrap { display: none !important; }
+            
+            #wpcontent, #wpbody-content { margin: 0; padding: 0; }
+            #wpcontent { background: #fff; }
+        </style>
+        <?php
+    }
+});
+
 if ( is_admin() ) {
     require_once ITSI_DIR . 'includes/class-it-smart-invoicing-admin.php';
     add_action( 'plugins_loaded', function() {
